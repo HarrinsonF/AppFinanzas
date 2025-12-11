@@ -152,19 +152,34 @@ def main(page: ft.Page):
     def cargar_wishlist():
         columna_metas.controls.clear()
         datos = db.obtener_metas()
+        
         for id_m, nom, costo, ahorrado in datos:
             progreso = ahorrado / costo if costo > 0 else 0
+            
+            # Botones de Acción
             btn_abonar = ft.IconButton(ft.Icons.ADD_CIRCLE, icon_color="green", tooltip="Abonar",
                 on_click=lambda e, id_ref=id_m: abrir_dialogo_meta(id_ref, es_retiro=False))
-            btn_retirar = ft.IconButton(ft.Icons.REMOVE_CIRCLE, icon_color="red", tooltip="Retirar",
+            
+            btn_retirar = ft.IconButton(ft.Icons.REMOVE_CIRCLE, icon_color="orange", tooltip="Retirar",
                 on_click=lambda e, id_ref=id_m: abrir_dialogo_meta(id_ref, es_retiro=True))
+                
+            # NUEVO: Botón Eliminar
+            btn_eliminar = ft.IconButton(ft.Icons.DELETE_FOREVER, icon_color="red", tooltip="Eliminar Meta",
+                on_click=lambda e, x=id_m: [db.eliminar_meta(x), actualizar_interfaz(), mostrar_snack("Meta eliminada (Dinero devuelto a Bóveda)")])
             
             columna_metas.controls.append(ft.Container(
                 content=ft.Column([
-                    ft.Row([ft.Text(nom, weight="bold", expand=True), ft.Text(f"S/ {ahorrado} / {costo}")]),
+                    ft.Row([
+                        ft.Text(nom, weight="bold", expand=True), 
+                        ft.Text(f"S/ {ahorrado} / {costo}"),
+                        btn_eliminar # <--- Aquí pusimos el tacho
+                    ]),
                     ft.ProgressBar(value=progreso, color=ft.Colors.PURPLE_400, bgcolor=ft.Colors.GREY_800),
                     ft.Row([btn_retirar, ft.Text("Gestión"), btn_abonar], alignment=ft.MainAxisAlignment.END)
-                ]), padding=10, border=ft.border.all(1, ft.Colors.GREY_800), border_radius=10, margin=5))
+                ]), 
+                padding=10, border=ft.border.all(1, ft.Colors.GREY_800), border_radius=10, margin=5
+            ))
+            
         columna_metas.controls.append(ft.ElevatedButton("Crear Meta", on_click=lambda e: page.open(dlg_nueva_meta), width=200))
 
     def cargar_historial():
@@ -387,5 +402,4 @@ def main(page: ft.Page):
     actualizar_interfaz() # Carga inicial
 
 if __name__ == "__main__":
-
     ft.app(target=main, assets_dir="assets")

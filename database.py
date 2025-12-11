@@ -297,3 +297,28 @@ def generar_reporte_csv(ruta_archivo):
     except Exception as e:
         print(f"Error CSV: {e}")
         return False
+
+def eliminar_meta(id_meta):
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    
+    # 1. Ver cuánta plata tenía esa meta antes de borrarla
+    c.execute("SELECT nombre, ahorrado FROM metas WHERE id = ?", (id_meta,))
+    res = c.fetchone()
+    
+    if res:
+        nombre, ahorrado = res
+        
+        # 2. Si tenía ahorros, devolvemos la plata a la Bóveda (Saldo Disponible)
+        if ahorrado > 0:
+            c.execute("UPDATE cuentas SET saldo = saldo + ? WHERE tipo = 'BOVEDA'", (ahorrado,))
+            
+            # Registramos que nos devolvieron la plata
+            c.execute("INSERT INTO movimientos (fecha, descripcion, monto, tipo) VALUES (?, ?, ?, ?)",
+                      (date.today(), f"Eliminación Meta: {nombre}", ahorrado, "INGRESO"))
+        
+        # 3. Borramos la meta definitivamente
+        c.execute("DELETE FROM metas WHERE id = ?", (id_meta,))
+        
+    conn.commit()
+    conn.close()
