@@ -9,31 +9,37 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+    
+    # 1. TRUCO MAESTRO: Descargamos el código directo en una carpeta con nombre válido
     - uses: actions/checkout@v4
+      with:
+        path: finanzas_app
 
-    # 1. Configurar Java 17
+    # 2. Configurar Java 17 (Obligatorio)
     - name: Setup Java
       uses: actions/setup-java@v4
       with:
         distribution: 'temurin'
         java-version: '17'
 
-    # 2. Instalar dependencias de Linux
+    # 3. Librerías de Linux
     - name: Install Linux dependencies
       run: |
         sudo apt-get update
         sudo apt-get install -y libgtk-3-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
 
+    # 4. Configurar Python
     - name: Setup Python
       uses: actions/setup-python@v5
       with:
         python-version: '3.11'
         
-    - name: Install dependencies
+    - name: Install Python dependencies
       run: |
         python -m pip install --upgrade pip
         pip install flet
         
+    # 5. Configurar Flutter
     - name: Setup Flutter
       uses: subosito/flutter-action@v2
       with:
@@ -44,19 +50,14 @@ jobs:
       run: |
         yes | flutter doctor --android-licenses
 
-    # --- AQUÍ ESTÁ EL TRUCO PARA ARREGLAR TU ERROR ---
-    # Movemos tus archivos a una carpeta con nombre en minúsculas (finanzas_app)
-    # para que Android no se queje por las mayúsculas.
-    - name: Prepare Project Structure
-      run: |
-        mkdir finanzas_app
-        mv main.py database.py requirements.txt finanzas_app/
-
+    # 6. COMPILAR (Entrando a la carpeta correcta)
     - name: Flet Build APK
       run: |
-        # Entramos a la carpeta nueva y compilamos desde ahí
         cd finanzas_app
-        flet build apk --project . --verbose --product "Mis Finanzas" --org "com.mifinanzas.app"
+        # Listamos los archivos para asegurar que todo está ahí (saldrá en el log)
+        ls -R
+        # Compilamos sin verbose para limpiar el log de basura
+        flet build apk --project . --product "Mis Finanzas" --org "com.mifinanzas.app"
         
     - name: Upload APK
       uses: actions/upload-artifact@v4
