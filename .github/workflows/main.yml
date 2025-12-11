@@ -11,7 +11,14 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    # 1. Instalar librerías de Linux necesarias (Esto arregla el error de GTK)
+    # 1. CONFIGURAR JAVA 17 (CRÍTICO PARA ANDROID)
+    - name: Setup Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+
+    # 2. Instalar librerías de Linux
     - name: Install Linux dependencies
       run: |
         sudo apt-get update
@@ -22,7 +29,7 @@ jobs:
       with:
         python-version: '3.11'
         
-    - name: Install Python dependencies
+    - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install flet
@@ -30,10 +37,9 @@ jobs:
     - name: Setup Flutter
       uses: subosito/flutter-action@v2
       with:
-        flutter-version: '3.24.0'
+        flutter-version: '3.24.0' # Usamos esta versión específica que sabemos que funciona bien con Flet
         channel: 'stable'
     
-    # 2. Aceptar Licencias de Android explícitamente (Esto arregla el error de Android toolchain)
     - name: Accept Android Licenses
       run: |
         yes | flutter doctor --android-licenses
