@@ -11,14 +11,14 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    # 1. CONFIGURAR JAVA 17 (CRÍTICO PARA ANDROID)
+    # 1. Configurar Java 17
     - name: Setup Java
       uses: actions/setup-java@v4
       with:
         distribution: 'temurin'
         java-version: '17'
 
-    # 2. Instalar librerías de Linux
+    # 2. Instalar dependencias de Linux
     - name: Install Linux dependencies
       run: |
         sudo apt-get update
@@ -37,19 +37,29 @@ jobs:
     - name: Setup Flutter
       uses: subosito/flutter-action@v2
       with:
-        flutter-version: '3.24.0' # Usamos esta versión específica que sabemos que funciona bien con Flet
+        flutter-version: '3.24.0'
         channel: 'stable'
     
     - name: Accept Android Licenses
       run: |
         yes | flutter doctor --android-licenses
-        
+
+    # --- AQUÍ ESTÁ EL TRUCO PARA ARREGLAR TU ERROR ---
+    # Movemos tus archivos a una carpeta con nombre en minúsculas (finanzas_app)
+    # para que Android no se queje por las mayúsculas.
+    - name: Prepare Project Structure
+      run: |
+        mkdir finanzas_app
+        mv main.py database.py requirements.txt finanzas_app/
+
     - name: Flet Build APK
       run: |
-        flet build apk --project . --verbose
+        # Entramos a la carpeta nueva y compilamos desde ahí
+        cd finanzas_app
+        flet build apk --project . --verbose --product "Mis Finanzas" --org "com.mifinanzas.app"
         
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
         name: finanzas-app-release
-        path: build/apk/app-release.apk
+        path: finanzas_app/build/apk/app-release.apk
