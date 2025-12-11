@@ -10,13 +10,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
-    
+
+    # 1. Instalar librerías de Linux necesarias (Esto arregla el error de GTK)
+    - name: Install Linux dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libgtk-3-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
+
     - name: Setup Python
       uses: actions/setup-python@v5
       with:
         python-version: '3.11'
         
-    - name: Install dependencies
+    - name: Install Python dependencies
       run: |
         python -m pip install --upgrade pip
         pip install flet
@@ -26,6 +32,11 @@ jobs:
       with:
         flutter-version: '3.24.0'
         channel: 'stable'
+    
+    # 2. Aceptar Licencias de Android explícitamente (Esto arregla el error de Android toolchain)
+    - name: Accept Android Licenses
+      run: |
+        yes | flutter doctor --android-licenses
         
     - name: Flet Build APK
       run: |
