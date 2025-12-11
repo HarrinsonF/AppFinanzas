@@ -10,10 +10,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     
-    # 1. TRUCO MAESTRO: Descargamos el código directo en una carpeta con nombre válido
+    # 1. Descargamos el código en una carpeta con nombre PERFECTO (snake_case)
     - uses: actions/checkout@v4
       with:
-        path: finanzas_app
+        path: finance_app
 
     # 2. Configurar Java 17 (Obligatorio)
     - name: Setup Java
@@ -50,17 +50,15 @@ jobs:
       run: |
         yes | flutter doctor --android-licenses
 
-    # 6. COMPILAR (Entrando a la carpeta correcta)
+    # 6. COMPILAR (EL CAMBIO CLAVE)
+    # No hacemos 'cd'. Ejecutamos desde fuera apuntando a la carpeta.
+    # Esto obliga a que el nombre del proyecto sea 'finance_app'.
     - name: Flet Build APK
       run: |
-        cd finanzas_app
-        # Listamos los archivos para asegurar que todo está ahí (saldrá en el log)
-        ls -R
-        # Compilamos sin verbose para limpiar el log de basura
-        flet build apk --project . --product "Mis Finanzas" --org "com.mifinanzas.app"
+        flet build apk finance_app --verbose --product "Mis Finanzas" --org "com.mifinanzas.app"
         
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
         name: finanzas-app-release
-        path: finanzas_app/build/apk/app-release.apk
+        path: finance_app/build/apk/app-release.apk
