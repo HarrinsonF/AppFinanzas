@@ -1,1 +1,4 @@
 flet
+requests
+pytesseract
+pillow

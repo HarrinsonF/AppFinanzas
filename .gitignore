@@ -1,0 +1,6 @@
+# Archivo .gitignore
+__pycache__/
+*.pyc
+*.db
+.vscode/
+venv/
