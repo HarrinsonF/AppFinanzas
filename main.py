@@ -41,7 +41,7 @@ def main(page: ft.Page):
         columna_historial = ft.Column()
         chart_container = ft.Column()
         
-        dd_meses = ft.Dropdown(width=150, label="Filtrar Mes", on_change=lambda e: cargar_historial())
+        dd_meses = ft.Dropdown(width=150, label="Filtrar Mes", on_select=lambda e: cargar_historial())
         id_meta_seleccionada = [None] 
         es_retiro_meta = [False]
 
