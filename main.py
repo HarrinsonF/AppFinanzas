@@ -469,6 +469,7 @@ def main(page: ft.Page):
         page.overlay.extend([fp_save, fp_load, fp_csv])
 
         # --- ELEMENTOS UI ---
+        
         # Dialog Settings
         set_input_boveda = ft.TextField(label="Nombre Bóveda")
         set_input_operativo = ft.TextField(label="Nombre Caja Chica")
