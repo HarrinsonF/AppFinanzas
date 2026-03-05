@@ -552,7 +552,7 @@ def main(page: ft.Page):
         )
 
         # Dialog: Cobrar Préstamo
-        dlg_cobro_monto = ft.TextField(label="Monto recibido S/", keyboard_type="number", helper_text="Si paga de más, será ingreso extra.")
+        dlg_cobro_monto = ft.TextField(label="Monto recibido S/", keyboard_type="number", hint_text="Si paga de más, será ingreso extra.")
         
         def cobrar_y_cerrar_prestamo(e):
             if dlg_cobro_monto.value:
