@@ -28,6 +28,10 @@ def inicializar_db():
     c.execute('''CREATE TABLE IF NOT EXISTS metas (
                     id INTEGER PRIMARY KEY, nombre TEXT, 
                     costo_total REAL, ahorrado REAL DEFAULT 0)''')
+    c.execute('''CREATE TABLE IF NOT EXISTS prestamos (
+                    id INTEGER PRIMARY KEY, deudor TEXT, 
+                    monto_total REAL, abonado REAL DEFAULT 0, 
+                    completado INTEGER DEFAULT 0)''')
 
     # --- DATOS INICIALES (Seed) ---
     c.execute("SELECT count(*) FROM cuentas")
@@ -276,13 +280,17 @@ def restaurar_base_datos(ruta_origen):
         return True
     except: return False
 
-def generar_reporte_csv(ruta_archivo):
+def generar_reporte_csv(ruta_archivo, mes_str="Todo"):
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
     
     try:
-        # Traemos TODOS los movimientos
-        c.execute("SELECT id, fecha, descripcion, monto, tipo FROM movimientos ORDER BY fecha DESC")
+        # Filtramos los movimientos según el mes seleccionado
+        if mes_str == "Todo":
+            c.execute("SELECT id, fecha, descripcion, monto, tipo FROM movimientos ORDER BY fecha DESC")
+        else:
+            c.execute("SELECT id, fecha, descripcion, monto, tipo FROM movimientos WHERE fecha LIKE ? ORDER BY fecha DESC", (f"{mes_str}%",))
+            
         datos = c.fetchall()
         
         with open(ruta_archivo, mode='w', newline='', encoding='utf-8') as file:
@@ -296,6 +304,9 @@ def generar_reporte_csv(ruta_archivo):
         return True
     except Exception as e:
         print(f"Error CSV: {e}")
+        # Aseguramos que la conexión se cierre incluso si hay un error
+        if conn:
+            conn.close()
         return False
 
 def eliminar_meta(id_meta):
@@ -319,6 +330,100 @@ def eliminar_meta(id_meta):
         
         # 3. Borramos la meta definitivamente
         c.execute("DELETE FROM metas WHERE id = ?", (id_meta,))
+        
+    conn.commit()
+    conn.close()
+
+
+def registrar_prestamo(deudor, monto):
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    
+    # 1. Crear el registro del préstamo
+    c.execute("INSERT INTO prestamos (deudor, monto_total) VALUES (?, ?)", (deudor, monto))
+    
+    # 2. El dinero sale de la BOVEDA
+    c.execute("UPDATE cuentas SET saldo = saldo - ? WHERE tipo = 'BOVEDA'", (monto,))
+    
+    # 3. Registrar el movimiento para el historial
+    c.execute("INSERT INTO movimientos (fecha, descripcion, monto, tipo) VALUES (?, ?, ?, ?)",
+              (date.today(), f"Préstamo a: {deudor}", monto, "GASTO")) # Figura como salida
+    
+    conn.commit()
+    conn.close()
+
+def abonar_prestamo(id_prestamo, monto_recibido):
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    
+    # 1. Ver cuánto nos debían exactamente
+    c.execute("SELECT deudor, monto_total, abonado FROM prestamos WHERE id = ?", (id_prestamo,))
+    res = c.fetchone()
+    if not res: return
+    
+    deudor, monto_total, abonado_actual = res
+    deuda_restante = monto_total - abonado_actual
+    
+    # 2. Lógica de "La Yapita" (El extra)
+    capital_a_cubrir = 0
+    ingreso_extra = 0
+    completado = 0
+    
+    if monto_recibido >= deuda_restante:
+        # Nos pagaron todo (y quizás un extra)
+        capital_a_cubrir = deuda_restante
+        ingreso_extra = monto_recibido - deuda_restante
+        completado = 1
+    else:
+        # Nos pagaron solo una parte
+        capital_a_cubrir = monto_recibido
+        
+    # 3. Actualizar el préstamo
+    c.execute("UPDATE prestamos SET abonado = abonado + ?, completado = ? WHERE id = ?", 
+              (capital_a_cubrir, completado, id_prestamo))
+    
+    # 4. El dinero físico entra a la BOVEDA
+    c.execute("UPDATE cuentas SET saldo = saldo + ? WHERE tipo = 'BOVEDA'", (monto_recibido,))
+    
+    # 5. Registrar movimientos separados para que tu historial sea claro
+    c.execute("INSERT INTO movimientos (fecha, descripcion, monto, tipo) VALUES (?, ?, ?, ?)",
+              (date.today(), f"Cobro préstamo: {deudor}", capital_a_cubrir, "INGRESO"))
+              
+    if ingreso_extra > 0:
+        c.execute("INSERT INTO movimientos (fecha, descripcion, monto, tipo) VALUES (?, ?, ?, ?)",
+                  (date.today(), f"Extra (Propina/Interés) de: {deudor}", ingreso_extra, "INGRESO"))
+    
+    conn.commit()
+    conn.close()
+
+def obtener_prestamos_activos():
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute("SELECT id, deudor, monto_total, abonado FROM prestamos WHERE completado = 0")
+    data = c.fetchall()
+    conn.close()
+    return data
+
+def eliminar_prestamo(id_prestamo):
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    
+    # 1. Ver cuánto dinero faltaba cobrar
+    c.execute("SELECT monto_total, abonado, deudor FROM prestamos WHERE id = ?", (id_prestamo,))
+    res = c.fetchone()
+    
+    if res:
+        monto_total, abonado, deudor = res
+        deuda_restante = monto_total - abonado
+        
+        # 2. Si faltaba cobrar plata, la devolvemos a la Bóveda para cuadrar la contabilidad
+        if deuda_restante > 0:
+            c.execute("UPDATE cuentas SET saldo = saldo + ? WHERE tipo = 'BOVEDA'", (deuda_restante,))
+            c.execute("INSERT INTO movimientos (fecha, descripcion, monto, tipo) VALUES (?, ?, ?, ?)",
+                      (date.today(), f"Anulación préstamo: {deudor}", deuda_restante, "INGRESO"))
+        
+        # 3. Borramos el registro
+        c.execute("DELETE FROM prestamos WHERE id = ?", (id_prestamo,))
         
     conn.commit()
     conn.close()

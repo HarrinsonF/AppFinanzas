@@ -12,8 +12,9 @@ import io
 pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exea'
 
 def main(page: ft.Page):
-    page.title = "Finanzas Master 4.0 (AI Edition)"
+    page.title = "Finanzas Master 4.0"
     page.theme_mode = ft.ThemeMode.DARK
+    page.theme = ft.Theme(color_scheme_seed=ft.Colors.LIGHT_BLUE_400)
     page.window_width = 420
     page.window_height = 850
     page.padding = 15
@@ -30,6 +31,8 @@ def main(page: ft.Page):
     
     columna_gastos_fijos = ft.Column()
     columna_metas = ft.Column()
+    columna_prestamos = ft.Column()
+    id_prestamo_seleccionado = [None]
     columna_historial = ft.Column()
     chart_container = ft.Column()
     
@@ -214,21 +217,38 @@ def main(page: ft.Page):
         saldo_boveda = db.obtener_saldo_por_tipo('BOVEDA')
         fijos_pendientes = db.obtener_fijos_pendientes()
         boveda_libre = saldo_boveda - fijos_pendientes
+        
+        # Obtenemos la plata que está en la calle
+        prestamos = db.obtener_prestamos_activos()
+        dinero_por_cobrar = sum(p[2] - p[3] for p in prestamos) if prestamos else 0.0
+        patrimonio_total = boveda_libre + dinero_por_cobrar
+        page.appbar.title.value = f"Mis Finanzas | Patrimonio: S/ {patrimonio_total:.2f}"
 
-        txt_info_bancos.value = (f"{config_actual['nombre_operativo']}: S/ {saldo_operativo:.2f}\n\n"
-                                 f"{config_actual['nombre_boveda']}: S/ {saldo_boveda:.2f}\n"
-                                 f"- Reservado Fijos: S/ {fijos_pendientes:.2f}\n"
-                                 f"= Disponible Real: S/ {boveda_libre:.2f}")
+        txt_info_bancos.value = (f"{config_actual['nombre_operativo']}: S/ {saldo_operativo:.2f}\n"
+                                 f"🏦 {config_actual['nombre_boveda']} Real: S/ {saldo_boveda:.2f}\n"
+                                 f"➖ Reservado Fijos: S/ {fijos_pendientes:.2f}\n"
+                                 f"✅ Disponible Liquidez: S/ {boveda_libre:.2f}\n"
+                                 f"------------------------\n"
+                                 f"🤝 Por Cobrar: S/ {dinero_por_cobrar:.2f}\n"
+                                 f"💰 PATRIMONIO: S/ {patrimonio_total:.2f}")
         
         cargar_lista_fijos()
         cargar_wishlist()
-        
+        cargar_lista_prestamos()
+
         if not dd_meses.value:
             hoy_str = date.today().strftime("%Y-%m")
             meses = db.obtener_meses_disponibles()
-            dd_meses.options = [ft.dropdown.Option(m) for m in meses]
-            if hoy_str not in meses and meses: dd_meses.value = meses[0]
-            else: dd_meses.value = hoy_str
+            
+            # Crear la lista de opciones agregando "Todo" al inicio
+            opciones = [ft.dropdown.Option("Todo")]
+            opciones.extend([ft.dropdown.Option(m) for m in meses])
+            dd_meses.options = opciones
+            
+            if hoy_str not in meses and meses: 
+                dd_meses.value = meses[0]
+            else: 
+                dd_meses.value = hoy_str
             
         cargar_historial()
         construir_grafico()
@@ -285,10 +305,44 @@ def main(page: ft.Page):
             columna_metas.controls.append(ft.Container(
                 content=ft.Column([
                     ft.Row([ft.Text(nom, weight="bold", expand=True), ft.Text(f"S/ {ahorrado} / {costo}"), btn_eliminar]),
-                    ft.ProgressBar(value=progreso, color=ft.Colors.PURPLE_400, bgcolor=ft.Colors.GREY_800),
+                    ft.ProgressBar(value=progreso, color=ft.Colors.LIGHT_BLUE_400, bgcolor=ft.Colors.BLUE_GREY_900),
                     ft.Row([btn_retirar, ft.Text("Gestión"), btn_abonar], alignment=ft.MainAxisAlignment.END)
-                ]), padding=10, border=ft.border.all(1, ft.Colors.GREY_800), border_radius=10, margin=5))
+                ]), padding=10, border=ft.border.all(1, ft.Colors.BLUE_GREY_900), border_radius=10, margin=5))
         columna_metas.controls.append(ft.ElevatedButton("Crear Meta", on_click=lambda e: page.open(dlg_nueva_meta), width=200))
+
+    def cargar_lista_prestamos():
+        columna_prestamos.controls.clear()
+        datos = db.obtener_prestamos_activos()
+        
+        if not datos:
+            columna_prestamos.controls.append(ft.Text("Nadie te debe dinero. ¡Qué paz!", color="grey", italic=True))
+            
+        for id_p, deudor, total, abonado in datos:
+            deuda_restante = total - abonado
+            progreso = abonado / total if total > 0 else 0
+            
+            btn_cobrar = ft.IconButton(
+                ft.Icons.MONETIZATION_ON, icon_color="green", tooltip="Recibir Pago",
+                on_click=lambda e, id_ref=id_p: abrir_dialogo_cobro(id_ref)
+            )
+            
+            # NUEVO: Botón de eliminar
+            btn_eliminar = ft.IconButton(
+                ft.Icons.DELETE_FOREVER, icon_color="red", tooltip="Anular/Borrar",
+                on_click=lambda e, x=id_p: [db.eliminar_prestamo(x), actualizar_interfaz(), mostrar_snack("Préstamo eliminado")]
+            )
+            
+            columna_prestamos.controls.append(
+                ft.Container(
+                    content=ft.Column([
+                        # Añadimos el btn_eliminar en la misma fila del título
+                        ft.Row([ft.Text(f"🤝 {deudor}", weight="bold", expand=True), ft.Text(f"Falta S/ {deuda_restante:.2f}"), btn_eliminar]),
+                        ft.ProgressBar(value=progreso, color=ft.Colors.CYAN_400, bgcolor=ft.Colors.BLUE_GREY_900),
+                        ft.Row([ft.Text(f"Pagado: S/ {abonado} de S/ {total}", size=12, color="grey"), btn_cobrar], alignment="spaceBetween")
+                    ]), padding=10, border=ft.border.all(1, ft.Colors.BLUE_GREY_800), border_radius=10, margin=5
+                )
+            )
+        columna_prestamos.controls.append(ft.ElevatedButton("Nuevo Préstamo", on_click=lambda e: page.open(dlg_nuevo_prestamo), width=200))
 
     def cargar_historial():
         columna_historial.controls.clear()
@@ -373,11 +427,36 @@ def main(page: ft.Page):
 
     # --- BACKUP & CSV ---
     def save_bkp(e: ft.FilePickerResultEvent):
-        if e.path: db.exportar_base_datos(e.path)
+        if e.path:
+            try:
+                db.exportar_base_datos(e.path)
+                mostrar_snack("✅ Backup guardado correctamente")
+            except Exception as ex:
+                mostrar_snack("❌ Error al guardar el backup")
+
     def load_bkp(e: ft.FilePickerResultEvent):
-        if e.files and db.restaurar_base_datos(e.files[0].path): actualizar_interfaz()
+        if e.files:
+            try:
+                if db.restaurar_base_datos(e.files[0].path):
+                    actualizar_interfaz()
+                    mostrar_snack("✅ Datos restaurados con éxito")
+                else:
+                    mostrar_snack("⚠️ El archivo no es válido")
+            except Exception as ex:
+                mostrar_snack("❌ Error al restaurar")
+    
     def save_csv(e: ft.FilePickerResultEvent):
-        if e.path: db.generar_reporte_csv(e.path)
+        if e.path:
+            try:
+                # Obtener el mes actual seleccionado en el dropdown
+                mes_seleccionado = dd_meses.value if dd_meses.value else "Todo"
+                
+                # Deberás modificar tu función en database.py para aceptar este parámetro
+                db.generar_reporte_csv(e.path, mes_seleccionado)
+                
+                mostrar_snack(f"📊 Reporte exportado ({mes_seleccionado})")
+            except Exception as ex:
+                mostrar_snack("❌ Error al exportar el reporte")
             
     fp_save = ft.FilePicker(on_result=save_bkp)
     fp_load = ft.FilePicker(on_result=load_bkp)
@@ -442,6 +521,50 @@ def main(page: ft.Page):
 
     dlg_confirmar_reinicio = ft.AlertDialog(title=ft.Text("¿Nuevo Mes?"), content=ft.Text("Se desmarcarán los fijos."),
         actions=[ft.TextButton("Sí", on_click=lambda e: [db.reiniciar_fijos_nuevo_mes(), setattr(dlg_confirmar_reinicio, 'open', False), actualizar_interfaz()])])
+    
+    # Dialog: Nuevo Préstamo
+    dlg_prestamo_deudor = ft.TextField(label="¿A quién le prestas?")
+    dlg_prestamo_monto = ft.TextField(label="Monto S/", keyboard_type="number")
+    
+    def registrar_y_cerrar_prestamo(e):
+        if dlg_prestamo_deudor.value and dlg_prestamo_monto.value:
+            try:
+                db.registrar_prestamo(dlg_prestamo_deudor.value, float(dlg_prestamo_monto.value))
+                dlg_nuevo_prestamo.open = False
+                dlg_prestamo_deudor.value = ""
+                dlg_prestamo_monto.value = ""
+                actualizar_interfaz()
+                mostrar_snack("Préstamo registrado (Salió de Bóveda) 💸")
+            except: pass
+
+    dlg_nuevo_prestamo = ft.AlertDialog(
+        title=ft.Text("Prestar Dinero"), 
+        content=ft.Column([dlg_prestamo_deudor, dlg_prestamo_monto], height=150),
+        actions=[ft.TextButton("Confirmar", on_click=registrar_y_cerrar_prestamo)]
+    )
+
+    # Dialog: Cobrar Préstamo
+    dlg_cobro_monto = ft.TextField(label="Monto recibido S/", keyboard_type="number", helper_text="Si paga de más, será ingreso extra.")
+    
+    def cobrar_y_cerrar_prestamo(e):
+        if dlg_cobro_monto.value:
+            try:
+                db.abonar_prestamo(id_prestamo_seleccionado[0], float(dlg_cobro_monto.value))
+                dlg_cobrar_prestamo.open = False
+                dlg_cobro_monto.value = ""
+                actualizar_interfaz()
+                mostrar_snack("Dinero recuperado a Bóveda 💰")
+            except: pass
+
+    dlg_cobrar_prestamo = ft.AlertDialog(
+        title=ft.Text("Registrar Pago"), 
+        content=dlg_cobro_monto,
+        actions=[ft.TextButton("Cobrar", on_click=cobrar_y_cerrar_prestamo)]
+    )
+
+    def abrir_dialogo_cobro(id_prestamo):
+        id_prestamo_seleccionado[0] = id_prestamo
+        page.open(dlg_cobrar_prestamo)
 
     # Elementos dinámicos
     lbl_boveda = ft.Text("Ingresos Bóveda", weight="bold", color="white")
@@ -454,9 +577,10 @@ def main(page: ft.Page):
     page.appbar = ft.AppBar(
         title=ft.Text("Mis Finanzas"),
         center_title=False,
-        bgcolor=ft.Colors.BLUE_GREY_900,
+        bgcolor=ft.Colors.BLUE_900,
+        color=ft.Colors.LIGHT_BLUE_100,
         actions=[
-            ft.IconButton(ft.Icons.SETTINGS, on_click=lambda e: page.open(dlg_settings))
+            ft.IconButton(ft.Icons.SETTINGS, icon_color=ft.Colors.LIGHT_BLUE_200, on_click=lambda e: page.open(dlg_settings))
         ]
     )
 
@@ -482,6 +606,17 @@ def main(page: ft.Page):
             lbl_boveda, 
             btn_ingreso_boveda
         ], horizontal_alignment="center")),
+
+        ft.Divider(),
+        ft.Text("Cuentas por Cobrar", size=20, weight="bold", color=ft.Colors.CYAN_400),
+
+        ft.Container(
+            content=ft.Column([columna_prestamos], scroll=ft.ScrollMode.AUTO),
+            height=280, 
+            border=ft.border.all(1, ft.Colors.BLUE_GREY_900),
+            border_radius=10,
+            padding=5
+        ),
 
         ft.Divider(),
         ft.Text("Metas", size=20, weight="bold"), 
