@@ -165,7 +165,8 @@ def main(page: ft.Page):
                 else:
                     mostrar_snack("⚠️ No pude leer el monto exacto.")
 
-        fp_ocr = ft.FilePicker(on_result=voucher_seleccionado)
+        fp_ocr = ft.FilePicker()
+        fp_ocr.on_result = voucher_seleccionado
         page.overlay.append(fp_ocr)
 
         # --- CONFIGURACIÓN ---
@@ -459,9 +460,14 @@ def main(page: ft.Page):
                 except Exception as ex:
                     mostrar_snack("❌ Error al exportar el reporte")
                 
-        fp_save = ft.FilePicker(on_result=save_bkp)
-        fp_load = ft.FilePicker(on_result=load_bkp)
-        fp_csv = ft.FilePicker(on_result=save_csv)
+        fp_save = ft.FilePicker()
+        fp_save.on_result = save_bkp
+        
+        fp_load = ft.FilePicker()
+        fp_load.on_result = load_bkp
+        
+        fp_csv = ft.FilePicker()
+        fp_csv.on_result = save_csv
         page.overlay.extend([fp_save, fp_load, fp_csv])
 
         # --- ELEMENTOS UI ---
