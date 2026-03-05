@@ -148,7 +148,7 @@ def main(page: ft.Page):
 
             return monto, desc, cuenta_sugerida
 
-        def voucher_seleccionado(e: ft.FilePickerResultEvent):
+        def voucher_seleccionado(e):
             if e.files:
                 mostrar_snack("Analizando imagen... ⏳")
                 page.update()
@@ -431,7 +431,7 @@ def main(page: ft.Page):
             page.update()
 
         # --- BACKUP & CSV ---
-        def save_bkp(e: ft.FilePickerResultEvent):
+        def save_bkp(e):
             if e.path:
                 try:
                     db.exportar_base_datos(e.path)
@@ -439,7 +439,7 @@ def main(page: ft.Page):
                 except Exception as ex:
                     mostrar_snack("❌ Error al guardar el backup")
 
-        def load_bkp(e: ft.FilePickerResultEvent):
+        def load_bkp(e):
             if e.files:
                 try:
                     if db.restaurar_base_datos(e.files[0].path):
@@ -449,16 +449,12 @@ def main(page: ft.Page):
                         mostrar_snack("⚠️ El archivo no es válido")
                 except Exception as ex:
                     mostrar_snack("❌ Error al restaurar")
-        
-        def save_csv(e: ft.FilePickerResultEvent):
+
+        def save_csv(e):
             if e.path:
                 try:
-                    # Obtener el mes actual seleccionado en el dropdown
                     mes_seleccionado = dd_meses.value if dd_meses.value else "Todo"
-                    
-                    # Deberás modificar tu función en database.py para aceptar este parámetro
                     db.generar_reporte_csv(e.path, mes_seleccionado)
-                    
                     mostrar_snack(f"📊 Reporte exportado ({mes_seleccionado})")
                 except Exception as ex:
                     mostrar_snack("❌ Error al exportar el reporte")
