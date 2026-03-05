@@ -1,3 +1,4 @@
+import os
 import flet as ft
 import database as db
 from datetime import date, datetime
@@ -9,7 +10,8 @@ import requests
 import io
 
 # CONFIGURA TU RUTA DE TESSERACT AQUÍ (Solo para Windows)
-pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exea'
+if os.name == 'nt':  # 'nt' significa que estás en Windows
+    pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 
 def main(page: ft.Page):
     page.title = "Finanzas Master 4.0"

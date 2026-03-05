@@ -4,7 +4,8 @@ import os
 from datetime import date, timedelta, datetime
 import csv
 
-DB_NAME = 'mis_finanzas.db'
+directorio_base = os.environ.get('HOME', os.path.abspath(os.path.dirname(__file__)))
+DB_NAME = os.path.join(directorio_base, 'mis_finanzas.db')
 
 def inicializar_db():
     conn = sqlite3.connect(DB_NAME)
