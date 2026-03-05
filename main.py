@@ -167,7 +167,7 @@ def main(page: ft.Page):
 
         fp_ocr = ft.FilePicker()
         fp_ocr.on_result = voucher_seleccionado
-        page.overlay.append(fp_ocr)
+        #page.overlay.append(fp_ocr)
 
         # --- CONFIGURACIÓN ---
         def cargar_configuracion():
@@ -468,7 +468,7 @@ def main(page: ft.Page):
         
         fp_csv = ft.FilePicker()
         fp_csv.on_result = save_csv
-        page.overlay.extend([fp_save, fp_load, fp_csv])
+        #page.overlay.extend([fp_save, fp_load, fp_csv])
 
         # --- ELEMENTOS UI ---
         
@@ -652,10 +652,32 @@ def main(page: ft.Page):
 
         tab_historial = ft.Container(padding=20, content=ft.Column([ft.Row([ft.Text("Historial", size=20, weight="bold"), dd_meses], alignment="spaceBetween"), columna_historial], scroll="auto"))
 
-        page.add(ft.Tabs(tabs=[
-            ft.Tab(text="Diario", content=tab_dashboard), ft.Tab(text="Fijos", content=tab_fijos),
-            ft.Tab(text="Bóveda", content=tab_wishlist), ft.Tab(text="Historial", content=tab_historial)
-        ], expand=True))
+        page.add(
+            ft.Tabs(
+                selected_index=0,
+                length=4, # El número total de pestañas
+                expand=True,
+                content=ft.Column([
+                    ft.TabBar(
+                        tabs=[
+                            ft.Tab(label="Diario"),
+                            ft.Tab(label="Fijos"),
+                            ft.Tab(label="Bóveda"),
+                            ft.Tab(label="Historial")
+                        ]
+                    ),
+                    ft.TabBarView(
+                        expand=True,
+                        controls=[
+                            tab_dashboard, 
+                            tab_fijos, 
+                            tab_wishlist, 
+                            tab_historial
+                        ]
+                    )
+                ], expand=True)
+            )
+        )
 
         actualizar_interfaz() 
     
