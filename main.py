@@ -266,25 +266,48 @@ def main(page: ft.Page):
             if not data:
                 chart_container.controls = [ft.Text("Sin gastos recientes", color="grey")]
                 return
-            bar_groups = []
-            max_y = 0
-            for i, (fecha, monto) in enumerate(data):
-                if monto > max_y: max_y = monto
-                bar_groups.append(ft.BarChartGroup(x=i, bar_rods=[ft.BarChartRod(from_y=0, to_y=monto, width=15, color=ft.Colors.AMBER, border_radius=5)]))
-            chart = ft.BarChart(
-                bar_groups=bar_groups,
-                border=ft.border.all(1, ft.Colors.GREY_800),
-                left_axis=ft.ChartAxis(labels_size=30),
-                bottom_axis=ft.ChartAxis(labels=[ft.ChartAxisLabel(value=i, label=ft.Text(d[0].split("-")[2])) for i, d in enumerate(data)]),
-                height=200, max_y=max_y * 1.2
-            )
-            chart_container.controls = [ft.Text("Gastos Semanales", weight="bold"), chart]
+            
+            # 1. Encontrar el gasto más alto para calcular las proporciones de las barras
+            max_y = max((monto for fecha, monto in data), default=0)
+            if max_y == 0: max_y = 1 # Para evitar división por cero
+            
+            barras = []
+            for fecha, monto in data:
+                # 2. Altura máxima de la barra será 120 píxeles
+                altura = (monto / max_y) * 120 if max_y > 0 else 0
+                dia = fecha.split("-")[2] # Extraer solo el día de la fecha
+                
+                # 3. Dibujamos cada barra individualmente
+                barra = ft.Column([
+                    ft.Text(f"{monto:.0f}", size=10, color=ft.Colors.GREY_500), # Monto arriba
+                    ft.Container(
+                        width=25, 
+                        height=altura if altura > 5 else 5, # Mínimo 5px para que se vea algo
+                        bgcolor=ft.Colors.LIGHT_BLUE_400, # ¡Celeste Cristal!
+                        border_radius=ft.BorderRadius.vertical(top=5)
+                    ),
+                    ft.Text(dia, size=12, weight="bold") # Día abajo
+                ], alignment=ft.MainAxisAlignment.END, horizontal_alignment=ft.CrossAxisAlignment.CENTER)
+                
+                barras.append(barra)
+                
+            # 4. Metemos todas las barras en la caja del gráfico
+            chart_container.controls = [
+                ft.Text("Gastos Semanales", weight="bold"), 
+                ft.Container(
+                    content=ft.Row(barras, alignment=ft.MainAxisAlignment.SPACE_EVENLY, vertical_alignment=ft.CrossAxisAlignment.END),
+                    height=180,
+                    padding=10,
+                    border=ft.Border.all(1, ft.Colors.BLUE_GREY_900),
+                    border_radius=10
+                )
+            ]
 
         def cargar_lista_fijos():
             columna_gastos_fijos.controls.clear()
             columna_gastos_fijos.controls.append(
                 ft.Row([ft.Text("Pagos Mensuales", weight="bold"),
-                        ft.ElevatedButton("Nuevo Mes 📅", bgcolor=ft.Colors.BLUE_GREY_900, color="white", scale=0.8, on_click=lambda e: page.open(dlg_confirmar_reinicio))],
+                        ft.ElevatedButton("Nuevo Mes 📅", bgcolor=ft.Colors.BLUE_GREY_900, color="white", scale=0.8, on_click=lambda e: page.show_dialog(dlg_confirmar_reinicio))],
                     alignment=ft.MainAxisAlignment.SPACE_BETWEEN))
             
             datos = db.obtener_todos_fijos()
@@ -294,7 +317,7 @@ def main(page: ft.Page):
                 btn_del = ft.IconButton(ft.Icons.DELETE_OUTLINE, icon_color="red", tooltip="Borrar",
                                         on_click=lambda e, x=id_g: [db.eliminar_gasto_fijo(x), actualizar_interfaz()])
                 columna_gastos_fijos.controls.append(ft.Row([chk, btn_del], alignment="spaceBetween"))
-            columna_gastos_fijos.controls.append(ft.TextButton("Agregar Nuevo Fijo +", on_click=lambda e: page.open(dlg_nuevo_fijo)))
+            columna_gastos_fijos.controls.append(ft.TextButton("Agregar Nuevo Fijo +", on_click=lambda e: page.show_dialog(dlg_nuevo_fijo)))
 
         def cargar_wishlist():
             columna_metas.controls.clear()
@@ -314,7 +337,7 @@ def main(page: ft.Page):
                         ft.ProgressBar(value=progreso, color=ft.Colors.LIGHT_BLUE_400, bgcolor=ft.Colors.BLUE_GREY_900),
                         ft.Row([btn_retirar, ft.Text("Gestión"), btn_abonar], alignment=ft.MainAxisAlignment.END)
                     ]), padding=10, border=ft.border.all(1, ft.Colors.BLUE_GREY_900), border_radius=10, margin=5))
-            columna_metas.controls.append(ft.ElevatedButton("Crear Meta", on_click=lambda e: page.open(dlg_nueva_meta), width=200))
+            columna_metas.controls.append(ft.ElevatedButton("Crear Meta", on_click=lambda e: page.show_dialog(dlg_nueva_meta), width=200))
 
         def cargar_lista_prestamos():
             columna_prestamos.controls.clear()
@@ -348,7 +371,7 @@ def main(page: ft.Page):
                         ]), padding=10, border=ft.border.all(1, ft.Colors.BLUE_GREY_800), border_radius=10, margin=5
                     )
                 )
-            columna_prestamos.controls.append(ft.ElevatedButton("Nuevo Préstamo", on_click=lambda e: page.open(dlg_nuevo_prestamo), width=200))
+            columna_prestamos.controls.append(ft.ElevatedButton("Nuevo Préstamo", on_click=lambda e: page.show_dialog(dlg_nuevo_prestamo), width=200))
 
         def cargar_historial():
             columna_historial.controls.clear()
@@ -357,8 +380,7 @@ def main(page: ft.Page):
             total = sum(m[3] for m in movs if m[4] == 'GASTO')
             
             # Botón Descargar Excel
-            btn_excel = ft.ElevatedButton("Descargar Excel 📊", icon=ft.Icons.DOWNLOAD, bgcolor=ft.Colors.GREEN_700, color="white",
-                            on_click=lambda e: fp_csv.save_file(file_name=f"Reporte_Finanzas_{date.today()}.csv"))
+            btn_excel = ft.Button("Descargar Excel 📊", icon=ft.Icons.DOWNLOAD, bgcolor=ft.Colors.GREEN_700, color="white", on_click=click_excel)
 
             columna_historial.controls.append(ft.Row([ft.Text(f"Gasto Total {mes}: S/ {total:.2f}", weight="bold", color="amber"), btn_excel], alignment="spaceBetween"))
             
@@ -427,11 +449,22 @@ def main(page: ft.Page):
             except: mostrar_snack("Error en valores numéricos")
 
         def mostrar_snack(t):
-            page.snack_bar = ft.SnackBar(ft.Text(t))
-            page.snack_bar.open = True
+            snack = ft.SnackBar(content=ft.Text(t))
+            page.overlay.append(snack)
+            snack.open = True
             page.update()
 
         # --- BACKUP & CSV ---
+
+        async def click_excel(e):
+            await fp_csv.save_file(file_name=f"Reporte_Finanzas_{date.today()}.csv")
+
+        async def click_backup(e):
+            await fp_save.save_file(file_name=f"Backup_{date.today()}.db")
+
+        async def click_restaurar(e):
+            await fp_load.pick_files()
+
         def save_bkp(e):
             if e.path:
                 try:
@@ -519,7 +552,7 @@ def main(page: ft.Page):
             titulo = "RETIRAR de Ahorro (Emergencia)" if es_retiro else "ABONAR a Ahorro"
             dlg_meta_gestion.title = ft.Text(titulo, color="red" if es_retiro else "green")
             dlg_gestion_monto.label = "Monto a Retirar" if es_retiro else "Monto a Abonar"
-            page.open(dlg_meta_gestion)
+            page.show_dialog(dlg_meta_gestion)
 
         dlg_gestion_monto = ft.TextField(label="Monto", keyboard_type="number")
         dlg_meta_gestion = ft.AlertDialog(title=ft.Text("Gestión"), content=dlg_gestion_monto,
@@ -572,11 +605,11 @@ def main(page: ft.Page):
 
         def abrir_dialogo_cobro(id_prestamo):
             id_prestamo_seleccionado[0] = id_prestamo
-            page.open(dlg_cobrar_prestamo)
+            page.show_dialog(dlg_cobrar_prestamo)
 
         # Elementos dinámicos
         lbl_boveda = ft.Text("Ingresos Bóveda", weight="bold", color="white")
-        btn_ingreso_boveda = ft.ElevatedButton("Ingreso", icon=ft.Icons.ATTACH_MONEY, bgcolor="white", color="green", on_click=lambda e: page.open(dlg_ingreso))
+        btn_ingreso_boveda = ft.ElevatedButton("Ingreso", icon=ft.Icons.ATTACH_MONEY, bgcolor="white", color="green", on_click=lambda e: page.show_dialog(dlg_ingreso))
         lbl_transferencia = ft.Text("Mover", weight="bold")
         btn_transfer = ft.ElevatedButton("Transferir", on_click=transferir)
         input_transfer = ft.TextField(label="Monto", width=150, keyboard_type="number")
@@ -588,7 +621,7 @@ def main(page: ft.Page):
             bgcolor=ft.Colors.BLUE_900,
             color=ft.Colors.LIGHT_BLUE_100,
             actions=[
-                ft.IconButton(ft.Icons.SETTINGS, icon_color=ft.Colors.LIGHT_BLUE_200, on_click=lambda e: page.open(dlg_settings))
+                ft.IconButton(ft.Icons.SETTINGS, icon_color=ft.Colors.LIGHT_BLUE_200, on_click=lambda e: page.show_dialog(dlg_settings))
             ]
         )
 
@@ -642,8 +675,8 @@ def main(page: ft.Page):
                 content=ft.Column([
                     ft.Text("Backup / Seguridad", weight="bold", color="amber"),
                     ft.Row([
-                        ft.ElevatedButton("Exportar Data 💾", on_click=lambda e: fp_save.save_file(file_name=f"Backup_{date.today()}.db"), bgcolor=ft.Colors.BLUE_GREY_800, color="white"),
-                        ft.ElevatedButton("Restaurar Data 📂", on_click=lambda e: fp_load.pick_files(), bgcolor=ft.Colors.GREY_900, color="white")
+                        ft.Button("Exportar Data 💾", on_click=click_backup, bgcolor=ft.Colors.BLUE_GREY_800, color="white"),
+                        ft.Button("Restaurar Data 📂", on_click=click_restaurar, bgcolor=ft.Colors.GREY_900, color="white")
                     ], alignment=ft.MainAxisAlignment.CENTER)
                 ], horizontal_alignment=ft.CrossAxisAlignment.CENTER)
             )
@@ -651,13 +684,17 @@ def main(page: ft.Page):
         ], scroll=ft.ScrollMode.AUTO))
 
         tab_historial = ft.Container(padding=20, content=ft.Column([ft.Row([ft.Text("Historial", size=20, weight="bold"), dd_meses], alignment="spaceBetween"), columna_historial], scroll="auto"))
+        
+        if page.platform == ft.PagePlatform.WINDOWS:
+            page.overlay.extend([fp_save, fp_load, fp_csv])
 
         page.add(
             ft.Tabs(
                 selected_index=0,
-                length=4, # El número total de pestañas
+                length=4, # Le decimos a Flet que son 4 pestañas en total
                 expand=True,
                 content=ft.Column([
+                    # 1. La barra de botones superior
                     ft.TabBar(
                         tabs=[
                             ft.Tab(label="Diario"),
@@ -666,6 +703,7 @@ def main(page: ft.Page):
                             ft.Tab(label="Historial")
                         ]
                     ),
+                    # 2. Las "pantallas" que cambian al presionar los botones
                     ft.TabBarView(
                         expand=True,
                         controls=[
